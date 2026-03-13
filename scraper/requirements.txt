@@ -1,0 +1,41 @@
+import requests
+from bs4 import BeautifulSoup
+from kafka import KafkaProducer
+import json
+from datetime import datetime
+import time
+
+KAFKA_TOPIC = "hn_news"
+KAFKA_SERVER = "localhost:9092"
+
+producer = KafkaProducer(
+    bootstrap_servers=KAFKA_SERVER,
+    value_serializer=lambda v: json.dumps(v).encode("utf-8")
+)
+
+URL = "https://news.ycombinator.com"
+
+
+def scrape():
+    response = requests.get(URL)
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    titles = soup.select(".titleline a")
+
+    for title in titles:
+
+        data = {
+            "title": title.text,
+            "url": title.get("href"),
+            "scraped_at": datetime.utcnow().isoformat()
+        }
+
+        producer.send(KAFKA_TOPIC, data)
+
+        print("Sent:", data)
+
+
+if __name__ == "__main__":
+    while True:
+        scrape()
+        time.sleep(30)
